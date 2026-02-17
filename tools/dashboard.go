@@ -17,6 +17,7 @@ import (
 
 	"github.com/grafana/grafana-openapi-client-go/models"
 	mcpgrafana "github.com/grafana/mcp-grafana"
+	"github.com/grafana/mcp-grafana/internal/parser"
 )
 
 type GetDashboardByUIDParams struct {
@@ -771,4 +772,92 @@ func AddDashboardTools(mcp *server.MCPServer, enableWriteTools bool) {
 	GetDashboardPanelQueries.Register(mcp)
 	GetDashboardProperty.Register(mcp)
 	GetDashboardSummary.Register(mcp)
+	ParseDashboardQueries.Register(mcp)
+	ListDashboardComponents.Register(mcp)
 }
+
+// Parse Dashboard Queries Tools
+
+type ParseDashboardQueriesParams struct {
+	UID string `json:"uid" jsonschema:"required,description=The UID of the dashboard to parse"`
+}
+
+type ParsedQuery struct {
+	PanelTitle string `json:"panel_title" jsonschema:"description=Title of the panel containing this query"`
+	Query      string `json:"query" jsonschema:"description=The PromQL query expression"`
+	Component  string `json:"component" jsonschema:"description=Detected component/service name from the query"`
+	MetricName string `json:"metric_name" jsonschema:"description=Extracted metric name"`
+}
+
+type ParseDashboardQueriesResult struct {
+	Queries []ParsedQuery `json:"queries" jsonschema:"description=List of parsed queries from the dashboard"`
+}
+
+func parseDashboardQueries(ctx context.Context, args ParseDashboardQueriesParams) (*ParseDashboardQueriesResult, error) {
+	dashboard, err := getDashboardByUID(ctx, GetDashboardByUIDParams{UID: args.UID})
+	if err != nil {
+		return nil, fmt.Errorf("get dashboard: %w", err)
+	}
+
+	dashboardMap, ok := dashboard.Dashboard.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("dashboard is not a JSON object")
+	}
+
+	// Import the parser package
+	parsed := parser.ParseDashboardFromMap(dashboardMap)
+
+	result := &ParseDashboardQueriesResult{
+		Queries: make([]ParsedQuery, len(parsed)),
+	}
+
+	for i, q := range parsed {
+		result.Queries[i] = ParsedQuery{
+			PanelTitle: q.PanelTitle,
+			Query:      q.QueryExpr,
+			Component:  q.Component,
+			MetricName: q.MetricName,
+		}
+	}
+
+	return result, nil
+}
+
+var ParseDashboardQueries = mcpgrafana.MustTool(
+	"parse_dashboard_queries",
+	"Parse dashboard panels to extract Prometheus queries with detected component/service names",
+	parseDashboardQueries,
+)
+
+type ListDashboardComponentsParams struct {
+	UID string `json:"uid" jsonschema:"required,description=The UID of the dashboard to analyze"`
+}
+
+type ListDashboardComponentsResult struct {
+	Components []string `json:"components" jsonschema:"description=List of unique component/service names detected in dashboard queries"`
+}
+
+func listDashboardComponents(ctx context.Context, args ListDashboardComponentsParams) (*ListDashboardComponentsResult, error) {
+	dashboard, err := getDashboardByUID(ctx, GetDashboardByUIDParams{UID: args.UID})
+	if err != nil {
+		return nil, fmt.Errorf("get dashboard: %w", err)
+	}
+
+	dashboardMap, ok := dashboard.Dashboard.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("dashboard is not a JSON object")
+	}
+
+	parsed := parser.ParseDashboardFromMap(dashboardMap)
+	components := parser.ExtractComponents(parsed)
+
+	return &ListDashboardComponentsResult{
+		Components: components,
+	}, nil
+}
+
+var ListDashboardComponents = mcpgrafana.MustTool(
+	"list_dashboard_components",
+	"Extract list of unique components/services from a dashboard's Prometheus queries",
+	listDashboardComponents,
+)
