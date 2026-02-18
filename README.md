@@ -27,6 +27,8 @@ _The following features are currently available in MCP server. This list is for 
 - **Update or create a dashboard:** Modify existing dashboards or create new ones. _Warning: Requires full dashboard JSON which can consume large amounts of context window space._
 - **Patch dashboard:** Apply specific changes to a dashboard without requiring the full JSON, significantly reducing context window usage for targeted modifications
 - **Get panel queries and datasource info:** Get the title, query string, and datasource information (including UID and type, if available) from every panel in a dashboard
+- **Parse dashboard queries:** Parse dashboard panels to extract Prometheus queries with automatic component/service name detection from query labels
+- **List dashboard components:** Extract a list of unique components/services monitored in a dashboard for service discovery and inventory
 
 #### Context Window Management
 
@@ -219,6 +221,8 @@ Scopes define the specific resources that permissions apply to. Each action requ
 | `get_dashboard_panel_queries`     | Dashboard   | Get panel title, queries, datasource UID and type from a dashboard  | `dashboards:read`                       | `dashboards:uid:abc123`                             |
 | `get_dashboard_property`          | Dashboard   | Extract specific parts of a dashboard using JSONPath expressions    | `dashboards:read`                       | `dashboards:uid:abc123`                             |
 | `get_dashboard_summary`           | Dashboard   | Get a compact summary of a dashboard without full JSON              | `dashboards:read`                       | `dashboards:uid:abc123`                             |
+| `parse_dashboard_queries`         | Dashboard   | Parse dashboard to extract Prometheus queries with component detection | `dashboards:read`                    | `dashboards:uid:abc123`                             |
+| `list_dashboard_components`       | Dashboard   | Extract unique components/services from dashboard queries           | `dashboards:read`                       | `dashboards:uid:abc123`                             |
 | `list_datasources`                | Datasources | List datasources                                                    | `datasources:read`                      | `datasources:*`                                     |
 | `get_datasource_by_uid`           | Datasources | Get a datasource by uid                                             | `datasources:read`                      | `datasources:uid:prometheus-uid`                    |
 | `get_datasource_by_name`          | Datasources | Get a datasource by name                                            | `datasources:read`                      | `datasources:*` or `datasources:uid:loki-uid`       |
